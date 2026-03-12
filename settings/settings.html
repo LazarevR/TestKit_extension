@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TestKit — Настройки</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --surface2: #22263a;
+      --border:   #2d3250;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --accent:   #6366f1;
+      --accent2:  #4f46e5;
+      --danger:   #ef4444;
+      --success:  #22c55e;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ──────────────────────────────────────── */
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+
+    /* ── Header ──────────────────────────────────────── */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .page-title span { color: var(--accent); }
+    .version { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Section ─────────────────────────────────────── */
+    .section { margin-bottom: 32px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+    }
+
+    /* ── Buttons ─────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.12s, opacity 0.12s;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+
+    .btn-primary   { background: var(--accent);  color: #fff; border-color: var(--accent); }
+    .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+
+    .btn-ghost     { background: transparent; color: var(--text); border-color: var(--border); }
+    .btn-ghost:hover:not(:disabled) { background: var(--surface2); }
+
+    .btn-danger    { background: transparent; color: var(--danger); border-color: #ef444430; }
+    .btn-danger:hover:not(:disabled) { background: #ef444415; }
+
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    /* ── Empty state ─────────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 32px 20px;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+    }
+    .empty-state-icon { font-size: 28px; margin-bottom: 8px; }
+
+    /* ── Group card ──────────────────────────────────── */
+    .group-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .group-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .group-head:hover { background: var(--surface2); }
+    .group-arrow {
+      font-size: 10px;
+      color: var(--muted);
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+    .group-card.open .group-arrow { transform: rotate(90deg); }
+    .group-icon { font-size: 16px; flex-shrink: 0; }
+    .group-name-text {
+      font-weight: 600;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .group-count {
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 1px 8px;
+      border: 1px solid var(--border);
+    }
+    .group-actions { display: flex; gap: 6px; }
+
+    .group-body {
+      display: none;
+      border-top: 1px solid var(--border);
+      padding: 10px 14px 12px;
+    }
+    .group-card.open .group-body { display: block; }
+
+    /* ── Item row ────────────────────────────────────── */
+    .item-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .item-row:last-of-type { border-bottom: none; }
+    .item-info { flex: 1; overflow: hidden; }
+    .item-name-label {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .item-content-preview {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: ui-monospace, monospace;
+      margin-top: 1px;
+    }
+    .item-actions { display: flex; gap: 4px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Inline forms ────────────────────────────────── */
+    .inline-form {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+    }
+    .form-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+    .form-row:last-child { margin-bottom: 0; }
+    .form-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
+
+    input[type="text"], textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 7px 10px;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.12s;
+    }
+    input[type="text"]:focus, textarea:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 70px; }
+
+    .form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+
+    /* ── Add group form ──────────────────────────────── */
+    #add-group-form {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    /* ── Subgroup card ───────────────────────────────── */
+    .subgroup-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 6px 0;
+      overflow: hidden;
+    }
+    .subgroup-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .subgroup-head:hover { background: var(--surface2); }
+    .subgroup-card.open .group-arrow { transform: rotate(90deg); }
+    .subgroup-name-text {
+      font-weight: 600;
+      font-size: 13px;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .subgroup-body {
+      display: none;
+      border-top: 1px solid var(--border);
+      padding: 8px 12px 10px;
+    }
+    .subgroup-card.open .subgroup-body { display: block; }
+
+    /* ── Group footer actions ────────────────────────── */
+    .group-footer-actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* ── Empty items placeholder ─────────────────────── */
+    .empty-items {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 6px 0 2px;
+    }
+
+    /* ── DB section ──────────────────────────────────── */
+    .db-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .db-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      margin-bottom: 12px;
+    }
+    .db-row input { flex: 1; }
+    .db-status {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    .db-status .ok  { color: var(--success); }
+    .db-status .err { color: var(--danger); }
+
+    /* ── I/O section ─────────────────────────────────── */
+    .io-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+    .io-block { flex: 1; min-width: 200px; }
+    .io-title { font-weight: 600; margin-bottom: 6px; }
+    .io-desc  { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+
+    /* ── Toast ────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 18px;
+      font-size: 13px;
+      color: var(--text);
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <div class="page-title">Dev<span>Kit</span> — Настройки</div>
+      <div class="version">v1.0.0</div>
+    </div>
+  </div>
+
+  <!-- ── Custom menus ──────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Пользовательские меню</div>
+      <button class="btn btn-primary btn-sm" id="btn-add-group">+ Добавить группу</button>
+    </div>
+
+    <!-- New group form (hidden by default) -->
+    <div id="add-group-form" class="hidden">
+      <div class="form-label">Название группы</div>
+      <input type="text" id="new-group-name" placeholder="Например: Email, Адреса, Подписи…" maxlength="40">
+      <div class="form-actions">
+        <button class="btn btn-ghost btn-sm" id="btn-cancel-group">Отмена</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-group">Создать</button>
+      </div>
+    </div>
+
+    <!-- Groups list -->
+    <div id="groups-list"></div>
+  </div>
+
+  <!-- ── Technology DB ────────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">База технологий</div>
+    </div>
+    <div class="db-card">
+      <div class="form-label">URL удалённой базы (JSON)</div>
+      <div class="db-row">
+        <input type="text" id="db-url-input"
+               placeholder="https://raw.githubusercontent.com/…/technologies.json"
+               maxlength="500">
+        <button class="btn btn-ghost btn-sm" id="btn-db-save">Сохранить</button>
+        <button class="btn btn-primary btn-sm" id="btn-db-refresh">Обновить сейчас</button>
+      </div>
+      <div class="db-status" id="db-status">Загрузка…</div>
+    </div>
+  </div>
+
+  <!-- ── Import / Export ───────────────────────────── -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Импорт / Экспорт</div>
+    </div>
+    <div class="io-card">
+      <div class="io-block">
+        <div class="io-title">Экспорт настроек</div>
+        <div class="io-desc">Скачать все кастомные меню как JSON-файл. Удобно для резервной копии или передачи коллегам.</div>
+        <button class="btn btn-ghost" id="btn-export">⬇ Скачать settings.json</button>
+      </div>
+      <div class="io-block">
+        <div class="io-title">Импорт настроек</div>
+        <div class="io-desc">Загрузить ранее экспортированный JSON. Существующие меню будут заменены.</div>
+        <label class="btn btn-ghost" style="cursor:pointer;">
+          ⬆ Загрузить файл
+          <input type="file" id="import-input" accept=".json" style="display:none;">
+        </label>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast notification -->
+<div id="toast"></div>
+
+<script src="settings.js"></script>
+</body>
+</html>

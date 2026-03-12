@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "TestKit",
+  "short_name": "TestKit",
+  "version": "1.0.0",
+  "description": "Testing & developer tools in your context menu: tech detection, SQL/XSS payloads, phone numbers, names, cache clearing, lorem ipsum.",
+
+  "permissions": [
+    "contextMenus",
+    "browsingData",
+    "storage",
+    "scripting",
+    "activeTab",
+    "tabs",
+    "alarms"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "action": {
+    "default_title": "TestKit — Настройки"
+  },
+
+  "options_ui": {
+    "page": "settings/settings.html",
+    "open_in_tab": true
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["popup/tech-popup.html", "technologies.json"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "testkit@testkit-extension",
+      "strict_min_version": "121.0"
+    }
+  }
+}

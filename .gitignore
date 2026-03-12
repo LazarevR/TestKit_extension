@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude Code local settings
+.claude/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dependencies (if npm is ever added)
+node_modules/
+
+# Logs
+*.log
+
+# Generator
+icons/generate.html
