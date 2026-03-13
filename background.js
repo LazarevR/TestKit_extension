@@ -73,11 +73,13 @@ const NAME_GROUPS = [
   {
     name: "Русские", id: "rus",
     names: [
+      "Ян",
       "Иван",
       "Иван Иванов",
       "г-н Иван",
       "Иван Иванов мл.",
       "Иван-Сергей Иванов",
+      "Яна",
       "Зина",
       "Зина Иванова",
       "г-жа Зина",
@@ -88,6 +90,8 @@ const NAME_GROUPS = [
   {
     name: "Латинские", id: "lat",
     names: [
+      "Ed",
+      "Joe",
       "John",
       "John Doe",
       "Mr. John",
@@ -185,6 +189,123 @@ const EDGE_CASES = [
   },
 ];
 
+const EMAIL_GROUPS = [
+  {
+    name: "✅ Валидные", id: "valid",
+    items: [
+      { label: "test@test.test",                      value: "test@test.test" },
+      { label: "test@test.com",                       value: "test@test.com" },
+      { label: "test@test.org",                       value: "test@test.org" },
+      { label: "test@test.net",                       value: "test@test.net" },
+      { label: "test@test.io",                        value: "test@test.io" },
+      { label: "test@test.ru",                        value: "test@test.ru" },
+      { label: "test@test.co",                        value: "test@test.co" },
+      { label: "test@test.dev",                       value: "test@test.dev" },
+      { label: "test@test.app",                       value: "test@test.app" },
+      { label: "test@test.xyz",                       value: "test@test.xyz" },
+      { label: "test.test@test.com",                  value: "test.test@test.com" },
+      { label: "test.test.test@test.com",             value: "test.test.test@test.com" },
+      { label: "test-test@test.com",                  value: "test-test@test.com" },
+      { label: "test_test@test.com",                  value: "test_test@test.com" },
+      { label: "test+test@test.com",                  value: "test+test@test.com" },
+      { label: "test.t@test.com",                     value: "test.t@test.com" },
+      { label: "t.test@test.com",                     value: "t.test@test.com" },
+      { label: "t@test.com",                          value: "t@test.com" },
+      { label: "te@test.com",                         value: "te@test.com" },
+      { label: "tes@test.com",                        value: "tes@test.com" },
+      { label: "test@test.test.test",                 value: "test@test.test.test" },
+      { label: "test@mail.test.com",                  value: "test@mail.test.com" },
+      { label: "test@sub.test.org",                   value: "test@sub.test.org" },
+      { label: "test@test.test.co",                   value: "test@test.test.co" },
+      { label: "test@a.test.com",                     value: "test@a.test.com" },
+      { label: "testtest@test.com",                   value: "testtest@test.com" },
+      { label: "testtesttest@test.com",               value: "testtesttest@test.com" },
+      { label: "test123@test.com",                    value: "test123@test.com" },
+      { label: "123test@test.com",                    value: "123test@test.com" },
+      { label: "test1@test.com",                      value: "test1@test.com" },
+      { label: "1test@test.com",                      value: "1test@test.com" },
+      { label: "test@test123.com",                    value: "test@test123.com" },
+      { label: "test@123test.com",                    value: "test@123test.com" },
+      { label: "test@test.testtest",                  value: "test@test.testtest" },
+      { label: "test@testtest.test",                  value: "test@testtest.test" },
+      { label: "test@test.testing",                   value: "test@test.testing" },
+      { label: "test@test.tester",                    value: "test@test.tester" },
+      { label: "test@test.tests",                     value: "test@test.tests" },
+      { label: "test@test.tested",                    value: "test@test.tested" },
+      { label: "TEST@test.com",                       value: "TEST@test.com" },
+      { label: "Test@test.com",                       value: "Test@test.com" },
+      { label: "TEST@TEST.COM",                       value: "TEST@TEST.COM" },
+      { label: "Test.Test@test.com",                  value: "Test.Test@test.com" },
+      { label: "tEsT@tEsT.com",                      value: "tEsT@tEsT.com" },
+      { label: "test@t.co",                           value: "test@t.co" },
+      { label: "test@te.st",                          value: "test@te.st" },
+      { label: "test@t.st",                           value: "test@t.st" },
+      { label: "t@t.co",                              value: "t@t.co" },
+    ]
+  },
+  {
+    name: "❌ Невалидные", id: "invalid",
+    items: [
+      { label: "testtest.com — нет @",               value: "testtest.com" },
+      { label: "test.test — нет @",                  value: "test.test" },
+      { label: "testtest — нет @",                   value: "testtest" },
+      { label: "test — нет @",                       value: "test" },
+      { label: "test@@test.com — двойной @",         value: "test@@test.com" },
+      { label: "test@test@test.com — два @",         value: "test@test@test.com" },
+      { label: "@@test.com — два @ вначале",         value: "@@test.com" },
+      { label: "test@@test — два @ без TLD",         value: "test@@test" },
+      { label: "test@ — нет домена",                 value: "test@" },
+      { label: "test@. — нет домена",                value: "test@." },
+      { label: "test@.com — домен начинается с .",   value: "test@.com" },
+      { label: "@test.com — нет локальной части",    value: "@test.com" },
+      { label: "@test — нет локальной части",        value: "@test" },
+      { label: "@ — только @",                       value: "@" },
+      { label: "test@test — нет TLD",                value: "test@test" },
+      { label: "test@testtest — нет TLD",            value: "test@testtest" },
+      { label: "test@t — нет TLD",                   value: "test@t" },
+      { label: ".test@test.com — точка в начале",    value: ".test@test.com" },
+      { label: "test.@test.com — точка перед @",     value: "test.@test.com" },
+      { label: "test@test. — точка в конце домена",  value: "test@test." },
+      { label: "test@test..com — двойная точка",     value: "test@test..com" },
+      { label: "test..test@test.com — двойная .",    value: "test..test@test.com" },
+      { label: "..test@test.com — двойная . вначале", value: "..test@test.com" },
+      { label: "test @test.com — пробел",            value: "test @test.com" },
+      { label: "test@ test.com — пробел",            value: "test@ test.com" },
+      { label: "test@test .com — пробел в домене",   value: "test@test .com" },
+      { label: "te st@test.com — пробел в локал.",   value: "te st@test.com" },
+      { label: " test@test.com — пробел вначале",    value: " test@test.com" },
+      { label: "test@test.com  — пробел вконце",     value: "test@test.com " },
+      { label: "test#test@test.com — #",             value: "test#test@test.com" },
+      { label: "test!test@test.com — !",             value: "test!test@test.com" },
+      { label: "test%test@test.com — %",             value: "test%test@test.com" },
+      { label: "test&test@test.com — &",             value: "test&test@test.com" },
+      { label: "test*test@test.com — *",             value: "test*test@test.com" },
+      { label: "test/test@test.com — /",             value: "test/test@test.com" },
+      { label: "test=test@test.com — =",             value: "test=test@test.com" },
+      { label: "test?test@test.com — ?",             value: "test?test@test.com" },
+      { label: "test^test@test.com — ^",             value: "test^test@test.com" },
+      { label: "test,test@test.com — ,",             value: "test,test@test.com" },
+      { label: "test;test@test.com — ;",             value: "test;test@test.com" },
+      { label: "test:test@test.com — :",             value: "test:test@test.com" },
+      { label: "test<script>@test.com — XSS",        value: "test<script>@test.com" },
+      { label: "' OR '1'='1@test.com — SQLi",        value: "' OR '1'='1@test.com" },
+      { label: "test@test.com;DROP TABLE — SQLi",    value: "test@test.com; DROP TABLE users--" },
+      { label: "{{test}}@test.com — Jinja/Twig",     value: "{{test}}@test.com" },
+      { label: "${test}@test.com — JS template",     value: "${test}@test.com" },
+      { label: "локальная часть >64 символов",       value: "testtesttesttesttesttesttesttesttesttesttesttesttesttesttesttest1@test.com" },
+      { label: "тест@test.com — кириллица",          value: "тест@test.com" },
+      { label: "test@тест.com — кириллица домен",    value: "test@тест.com" },
+      { label: "тест@тест.тест — всё кириллица",     value: "тест@тест.тест" },
+      { label: "[пусто]",                            value: "" },
+      { label: "[только пробелы]",                   value: "   " },
+      { label: "null — строка",                      value: "null" },
+      { label: "undefined — строка",                 value: "undefined" },
+      { label: "none — строка",                      value: "none" },
+      { label: "NULL — строка",                      value: "NULL" },
+    ]
+  }
+];
+
 // Lookup: menu item ID → text to insert (populated once at load)
 const BUILTIN_MAP = new Map();
 SQL_INJECTIONS.forEach((s, i) => BUILTIN_MAP.set(`dk-sql-${i}`, s));
@@ -192,6 +313,7 @@ XSS_SCRIPTS.forEach((s, i) => BUILTIN_MAP.set(`dk-xss-${i}`, s));
 PHONE_COUNTRIES.forEach(c => c.nums.forEach((n, j) => BUILTIN_MAP.set(`dk-phone-${c.id}-${j}`, n)));
 NAME_GROUPS.forEach(g => g.names.forEach((n, j) => BUILTIN_MAP.set(`dk-names-${g.id}-${j}`, n)));
 EDGE_CASES.forEach(g => g.items.forEach((item, j) => BUILTIN_MAP.set(`dk-edge-${g.id}-${j}`, item.value)));
+EMAIL_GROUPS.forEach(g => g.items.forEach((item, j) => BUILTIN_MAP.set(`dk-email-${g.id}-${j}`, item.value)));
 
 // ── Lifecycle ─────────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(() => {
@@ -305,6 +427,15 @@ async function buildContextMenu() {
       g.items.forEach((item, j) => {
         const lbl = item.label.length > 50 ? item.label.substring(0, 47) + "…" : item.label;
         mk({ id: `dk-edge-${g.id}-${j}`, parentId: `dk-edge-${g.id}`, title: lbl, contexts: cx });
+      });
+    });
+
+    mk({ id: "dk-email", parentId: "dk", title: "📧 E-mails", contexts: cx });
+    EMAIL_GROUPS.forEach(g => {
+      mk({ id: `dk-email-${g.id}`, parentId: "dk-email", title: g.name, contexts: cx });
+      g.items.forEach((item, j) => {
+        const lbl = item.label.length > 50 ? item.label.substring(0, 47) + "…" : item.label;
+        mk({ id: `dk-email-${g.id}-${j}`, parentId: `dk-email-${g.id}`, title: lbl, contexts: cx });
       });
     });
 

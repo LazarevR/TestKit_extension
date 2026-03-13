@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "TestKit",
   "short_name": "TestKit",
-  "version": "1.0.0",
-  "description": "Testing & developer tools in your context menu: tech detection, SQL/XSS payloads, phone numbers, names, cache clearing, lorem ipsum.",
+  "version": "1.0.1",
+  "description": "Testing & developer tools in your context menu: tech detection, SQL/XSS payloads, phone numbers, names, emails, cache clearing, lorem ipsum.",
 
   "permissions": [
     "contextMenus",
