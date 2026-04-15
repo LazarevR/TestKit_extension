@@ -525,13 +525,21 @@ async function handleTechnology(tab) {
 }
 
 // ── Clear cache + hard reload ─────────────────────────────────
+// Firefox does not support per-origin cache clearing (origins parameter ignored/throws).
+// bypassCache reload is the effective solution for both browsers.
 async function handleClearCache(tab) {
+  const { origin } = new URL(tab.url);
+  // Chrome: clears cache for this origin only; Firefox: throws (not supported) — ignore
   try {
-    const { origin } = new URL(tab.url);
     await chrome.browsingData.removeCache({ origins: [origin] });
+  } catch {
+    // Firefox: per-origin cache clearing is not supported; bypassCache reload below handles it
+  }
+  // Always perform a hard reload regardless of whether removeCache succeeded
+  try {
     await chrome.tabs.reload(tab.id, { bypassCache: true });
   } catch (err) {
-    console.error("[TestKit] Clear cache failed:", err);
+    console.error("[TestKit] Hard reload failed:", err);
     try {
       await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => location.reload(true) });
     } catch {}
@@ -539,21 +547,31 @@ async function handleClearCache(tab) {
 }
 
 // ── Clear all site data + hard reload ────────────────────────
-// Note: browsingData.remove with `origins` filter only supports:
-// cache, cookies, localStorage, serviceWorkers, cacheStorage.
-// sessionStorage and indexedDB are NOT compatible with origin filtering.
+// Chrome: uses `origins` (URL-based) filtering.
+// Firefox < 128: `origins` not supported; falls back to `hostnames` (supported since Firefox 56).
+// sessionStorage and indexedDB are not compatible with origin/hostname filtering → excluded.
 async function handleClearData(tab) {
+  const url = new URL(tab.url);
+  const { origin } = url;
+  const hostname = url.hostname;
+  const dataTypes = { cache: true, cookies: true, localStorage: true,
+                      serviceWorkers: true, cacheStorage: true };
   try {
-    const { origin } = new URL(tab.url);
-    await chrome.browsingData.remove(
-      { origins: [origin] },
-      { cache: true, cookies: true, localStorage: true,
-        serviceWorkers: true, cacheStorage: true }
-    );
-    await chrome.tabs.reload(tab.id, { bypassCache: true });
-  } catch (err) {
-    console.error("[TestKit] Clear data failed:", err);
+    // Chrome and Firefox 128+
+    await chrome.browsingData.remove({ origins: [origin] }, dataTypes);
+  } catch {
+    // Firefox fallback: hostnames-based filtering (supported since Firefox 56).
+    // Note: cache is not supported via hostnames; bypassCache reload compensates.
+    try {
+      await chrome.browsingData.remove(
+        { hostnames: [hostname] },
+        { cookies: true, localStorage: true, serviceWorkers: true, cacheStorage: true }
+      );
+    } catch (err2) {
+      console.error("[TestKit] Clear data failed:", err2);
+    }
   }
+  await chrome.tabs.reload(tab.id, { bypassCache: true });
 }
 
 // ── Lorem ipsum ───────────────────────────────────────────────
