@@ -3,7 +3,7 @@
   "name": "TestKit",
   "short_name": "TestKit",
   "version": "1.0.2",
-  "description": "Testing & developer tools in your context menu: tech detection, SQL/XSS payloads, phone numbers, names, emails, cache clearing, lorem ipsum.",
+  "description": "Developer & QA tools in your context menu: tech detection, HTTP headers analysis, meta tags (SEO), SQL/XSS payloads, phone numbers, names, emails, cache clearing, lorem ipsum.",
 
   "permissions": [
     "contextMenus",
