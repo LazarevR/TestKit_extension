@@ -376,9 +376,11 @@ async function buildContextMenu() {
     const cx = ["all"];
     const mk = (props) => chrome.contextMenus.create(props);
 
-    mk({ id: "dk",       title: "TestKit", contexts: cx });
-    mk({ id: "dk-tech",  parentId: "dk", title: "🔍 Технологии сайта",      contexts: cx });
-    mk({ id: "dk-sep1",  parentId: "dk", type: "separator",                  contexts: cx });
+    mk({ id: "dk",          title: "TestKit", contexts: cx });
+    mk({ id: "dk-tech",    parentId: "dk", title: "🔍 Технологии сайта",      contexts: cx });
+    mk({ id: "dk-headers", parentId: "dk", title: "🔐 HTTP-заголовки",         contexts: cx });
+    mk({ id: "dk-meta",    parentId: "dk", title: "🏷️ Meta-теги (SEO)",        contexts: cx });
+    mk({ id: "dk-sep1",    parentId: "dk", type: "separator",                   contexts: cx });
     mk({ id: "dk-cache", parentId: "dk", title: "🔄 Очистка кэша и рефреш", contexts: cx });
     mk({ id: "dk-data",  parentId: "dk", title: "🗑️ Очистка данных сайта",  contexts: cx });
     mk({ id: "dk-sep2",  parentId: "dk", type: "separator",                  contexts: cx });
@@ -478,6 +480,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const id = info.menuItemId;
 
   if (id === "dk-tech")     return handleTechnology(tab);
+  if (id === "dk-headers")  return handleHeaders(tab);
+  if (id === "dk-meta")     return handleMeta(tab);
   if (id === "dk-cache")    return handleClearCache(tab);
   if (id === "dk-data")     return handleClearData(tab);
   if (id === "dk-settings") return chrome.runtime.openOptionsPage();
@@ -488,6 +492,67 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (id.startsWith("dk-ci-")) return handleCustomItem(tab, id.slice(6));
   if (BUILTIN_MAP.has(id))    return handleBuiltinInsert(tab, BUILTIN_MAP.get(id));
 });
+
+// ── HTTP Headers check ────────────────────────────────────────
+async function handleHeaders(tab) {
+  if (!tab?.url || !/^https?:\/\//.test(tab.url)) return;
+  const isHttps = tab.url.startsWith("https://");
+  let headers = {};
+  let fetchError = null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    let res;
+    try {
+      res = await fetch(tab.url, { method: "HEAD", credentials: "include", cache: "no-store", redirect: "follow", signal: controller.signal });
+    } catch {
+      res = await fetch(tab.url, { method: "GET",  credentials: "include", cache: "no-store", redirect: "follow", signal: controller.signal });
+    }
+    clearTimeout(timer);
+    res.headers.forEach((value, name) => { headers[name.toLowerCase()] = value; });
+  } catch (err) {
+    clearTimeout(timer);
+    fetchError = err.name === "AbortError" ? "Таймаут запроса (8с)" : err.message;
+  }
+
+  await chrome.storage.session.set({
+    headersScan: { headers, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "", timestamp: Date.now(), isHttps, error: fetchError }
+  });
+  chrome.windows.create({ url: chrome.runtime.getURL("popup/headers-popup.html"), type: "popup", width: 640, height: 740 });
+}
+
+// ── Meta tags scan ────────────────────────────────────────────
+async function handleMeta(tab) {
+  try {
+    const [injection] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      world:  "MAIN",
+      func:   scanMetaTags
+    });
+    if (!injection?.result) return;
+    await chrome.storage.session.set({
+      metaScan: { ...injection.result, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "", timestamp: Date.now() }
+    });
+    chrome.windows.create({ url: chrome.runtime.getURL("popup/meta-popup.html"), type: "popup", width: 620, height: 720 });
+  } catch (err) {
+    console.error("[TestKit] Meta scan failed:", err);
+  }
+}
+
+function scanMetaTags() {
+  const tags = [];
+  document.querySelectorAll("meta").forEach(el => {
+    const name     = el.getAttribute("name")       || "";
+    const property = el.getAttribute("property")   || "";
+    const httpEquiv= el.getAttribute("http-equiv") || "";
+    const charset  = el.getAttribute("charset")    || "";
+    const content  = el.getAttribute("content")    || "";
+    if (name || property || httpEquiv || charset) tags.push({ name, property, httpEquiv, charset, content });
+  });
+  const canonical = document.querySelector("link[rel='canonical']")?.href || "";
+  return { pageTitle: document.title, tags, canonical };
+}
 
 // ── Technology scan ───────────────────────────────────────────
 async function handleTechnology(tab) {
