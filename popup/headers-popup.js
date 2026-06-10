@@ -81,15 +81,40 @@ const SEV = {
 };
 
 // ── Init ─────────────────────────────────────────────────────
+const NAV_PAGES = { tech: "tech-popup.html", headers: "headers-popup.html", meta: "meta-popup.html" };
+
+function initNav() {
+  document.querySelector(".nav-bar").addEventListener("click", e => {
+    const btn = e.target.closest(".nav-btn[data-to]");
+    if (!btn || btn.classList.contains("active")) return;
+    window.location.href = NAV_PAGES[btn.dataset.to];
+  });
+}
+
 async function init() {
+  initNav();
+
   document.getElementById("content").addEventListener("click", e => {
     const h = e.target.closest(".section-header[data-key]");
     if (h) document.getElementById("sec-" + h.dataset.key)?.classList.toggle("collapsed");
   });
 
   try {
-    const { headersScan } = await chrome.storage.session.get("headersScan");
-    if (!headersScan) { renderError("Данные не найдены. Попробуйте снова."); return; }
+    let { headersScan } = await chrome.storage.session.get("headersScan");
+
+    if (!headersScan) {
+      const { currentTab } = await chrome.storage.session.get("currentTab");
+      if (!currentTab?.tabId) { renderError("Данные не найдены. Откройте через контекстное меню."); return; }
+      document.getElementById("content").innerHTML = `<div class="loading"><div class="spinner"></div><span>Получаем заголовки…</span></div>`;
+      await new Promise((resolve, reject) => {
+        chrome.storage.onChanged.addListener(function listener(changes, area) {
+          if (area === "session" && changes.headersScan) { chrome.storage.onChanged.removeListener(listener); resolve(changes.headersScan.newValue); }
+        });
+        chrome.runtime.sendMessage({ action: "triggerScan", type: "headers", tabId: currentTab.tabId }, r => { if (r?.ok === false) reject(new Error(r.error)); });
+      }).then(data => { headersScan = data; }).catch(err => { renderError("Не удалось получить заголовки: " + err.message); });
+      if (!headersScan) return;
+    }
+
     renderHeader(headersScan);
     if (headersScan.error) { renderError("Не удалось получить заголовки: " + headersScan.error); return; }
     renderBody(headersScan.headers, headersScan.isHttps);

@@ -13,26 +13,45 @@ const CATEGORIES = [
   { key: "other",      label: "Other",           color: "#94a3b8" }
 ];
 
+const NAV_PAGES = { tech: "tech-popup.html", headers: "headers-popup.html", meta: "meta-popup.html" };
+
+function initNav() {
+  document.querySelector(".nav-bar").addEventListener("click", e => {
+    const btn = e.target.closest(".nav-btn[data-to]");
+    if (!btn || btn.classList.contains("active")) return;
+    window.location.href = NAV_PAGES[btn.dataset.to];
+  });
+}
+
 async function init() {
-  // Event delegation for section collapse/expand
+  initNav();
+
   document.getElementById("content").addEventListener("click", (e) => {
     const header = e.target.closest(".section-header[data-key]");
     if (header) toggleSection(header.dataset.key);
   });
 
   try {
-    const { techScan } = await chrome.storage.session.get("techScan");
+    let { techScan } = await chrome.storage.session.get("techScan");
 
     if (!techScan) {
-      renderError("Данные не найдены. Попробуйте снова.");
-      return;
+      const { currentTab } = await chrome.storage.session.get("currentTab");
+      if (!currentTab?.tabId) { renderError("Данные не найдены. Откройте через контекстное меню."); return; }
+      document.getElementById("content").innerHTML = `<div class="loading"><div class="spinner"></div><span>Сканируем технологии…</span></div>`;
+      await new Promise((resolve, reject) => {
+        chrome.storage.onChanged.addListener(function listener(changes, area) {
+          if (area === "session" && changes.techScan) { chrome.storage.onChanged.removeListener(listener); resolve(changes.techScan.newValue); }
+        });
+        chrome.runtime.sendMessage({ action: "triggerScan", type: "tech", tabId: currentTab.tabId }, r => { if (r?.ok === false) reject(new Error(r.error)); });
+      }).then(data => { techScan = data; }).catch(err => { renderError("Не удалось выполнить сканирование: " + err.message); });
+      if (!techScan) return;
     }
 
     const { data, url, title, favIconUrl, timestamp } = techScan;
     renderHeader({ url, title, favIconUrl, timestamp });
     renderBody(data);
   } catch (err) {
-    renderError("Ошибка загрузки данных: " + err.message);
+    renderError("Ошибка: " + err.message);
   }
 }
 

@@ -360,11 +360,20 @@ if (chrome.contextMenus.onShown) {
   });
 }
 
-// Messages from settings page
+// Messages from settings page and popups
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action === "fetchTechDB") {
     fetchAndCacheRemoteTechDB().then(ok => sendResponse({ ok }));
-    return true; // keep channel open for async response
+    return true;
+  }
+  if (msg.action === "triggerScan") {
+    chrome.tabs.get(msg.tabId).then(async tab => {
+      if (msg.type === "tech")    await scanTechData(tab);
+      if (msg.type === "headers") await scanHeadersData(tab);
+      if (msg.type === "meta")    await scanMetaData(tab);
+      sendResponse({ ok: true });
+    }).catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
   }
 });
 
@@ -494,12 +503,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 });
 
 // ── HTTP Headers check ────────────────────────────────────────
-async function handleHeaders(tab) {
-  if (!tab?.url || !/^https?:\/\//.test(tab.url)) return;
+async function scanHeadersData(tab) {
+  if (!tab?.url || !/^https?:\/\//.test(tab.url)) throw new Error("URL недоступен для анализа");
   const isHttps = tab.url.startsWith("https://");
-  let headers = {};
-  let fetchError = null;
-
+  let headers = {}, fetchError = null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
@@ -515,25 +522,30 @@ async function handleHeaders(tab) {
     clearTimeout(timer);
     fetchError = err.name === "AbortError" ? "Таймаут запроса (8с)" : err.message;
   }
-
   await chrome.storage.session.set({
-    headersScan: { headers, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "", timestamp: Date.now(), isHttps, error: fetchError }
+    headersScan: { headers, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "", timestamp: Date.now(), isHttps, error: fetchError, tabId: tab.id },
+    currentTab:  { tabId: tab.id, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "" }
   });
+}
+
+async function handleHeaders(tab) {
+  await scanHeadersData(tab);
   chrome.windows.create({ url: chrome.runtime.getURL("popup/headers-popup.html"), type: "popup", width: 640, height: 740 });
 }
 
 // ── Meta tags scan ────────────────────────────────────────────
+async function scanMetaData(tab) {
+  const [injection] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "MAIN", func: scanMetaTags });
+  if (!injection?.result) throw new Error("Script injection returned no result");
+  await chrome.storage.session.set({
+    metaScan:   { ...injection.result, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "", timestamp: Date.now(), tabId: tab.id },
+    currentTab: { tabId: tab.id, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "" }
+  });
+}
+
 async function handleMeta(tab) {
   try {
-    const [injection] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      world:  "MAIN",
-      func:   scanMetaTags
-    });
-    if (!injection?.result) return;
-    await chrome.storage.session.set({
-      metaScan: { ...injection.result, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "", timestamp: Date.now() }
-    });
+    await scanMetaData(tab);
     chrome.windows.create({ url: chrome.runtime.getURL("popup/meta-popup.html"), type: "popup", width: 620, height: 720 });
   } catch (err) {
     console.error("[TestKit] Meta scan failed:", err);
@@ -555,35 +567,20 @@ function scanMetaTags() {
 }
 
 // ── Technology scan ───────────────────────────────────────────
+async function scanTechData(tab) {
+  const mergedDB = await getMergedTechDB();
+  const [injection] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "MAIN", func: scanTechnologies, args: [mergedDB] });
+  if (!injection?.result) throw new Error("Script injection returned no result");
+  await chrome.storage.session.set({
+    techScan:   { data: injection.result, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "", timestamp: Date.now(), tabId: tab.id },
+    currentTab: { tabId: tab.id, url: tab.url, title: tab.title, favIconUrl: tab.favIconUrl || "" }
+  });
+}
+
 async function handleTechnology(tab) {
   try {
-    const mergedDB = await getMergedTechDB();
-
-    const [injection] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      world:  "MAIN",
-      func:   scanTechnologies,
-      args:   [mergedDB]
-    });
-
-    if (!injection?.result) return;
-
-    await chrome.storage.session.set({
-      techScan: {
-        data:       injection.result,
-        url:        tab.url,
-        title:      tab.title,
-        favIconUrl: tab.favIconUrl || "",
-        timestamp:  Date.now()
-      }
-    });
-
-    chrome.windows.create({
-      url:    chrome.runtime.getURL("popup/tech-popup.html"),
-      type:   "popup",
-      width:  600,
-      height: 680
-    });
+    await scanTechData(tab);
+    chrome.windows.create({ url: chrome.runtime.getURL("popup/tech-popup.html"), type: "popup", width: 600, height: 680 });
   } catch (err) {
     console.error("[TestKit] Technology scan failed:", err);
   }

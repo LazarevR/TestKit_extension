@@ -48,15 +48,40 @@ const GROUPS = [
 ];
 
 // ── Init ─────────────────────────────────────────────────────
+const NAV_PAGES = { tech: "tech-popup.html", headers: "headers-popup.html", meta: "meta-popup.html" };
+
+function initNav() {
+  document.querySelector(".nav-bar").addEventListener("click", e => {
+    const btn = e.target.closest(".nav-btn[data-to]");
+    if (!btn || btn.classList.contains("active")) return;
+    window.location.href = NAV_PAGES[btn.dataset.to];
+  });
+}
+
 async function init() {
+  initNav();
+
   document.getElementById("content").addEventListener("click", e => {
     const h = e.target.closest(".section-header[data-key]");
     if (h) document.getElementById("sec-" + h.dataset.key)?.classList.toggle("collapsed");
   });
 
   try {
-    const { metaScan } = await chrome.storage.session.get("metaScan");
-    if (!metaScan) { renderError("Данные не найдены. Попробуйте снова."); return; }
+    let { metaScan } = await chrome.storage.session.get("metaScan");
+
+    if (!metaScan) {
+      const { currentTab } = await chrome.storage.session.get("currentTab");
+      if (!currentTab?.tabId) { renderError("Данные не найдены. Откройте через контекстное меню."); return; }
+      document.getElementById("content").innerHTML = `<div class="loading"><div class="spinner"></div><span>Читаем мета-теги…</span></div>`;
+      await new Promise((resolve, reject) => {
+        chrome.storage.onChanged.addListener(function listener(changes, area) {
+          if (area === "session" && changes.metaScan) { chrome.storage.onChanged.removeListener(listener); resolve(changes.metaScan.newValue); }
+        });
+        chrome.runtime.sendMessage({ action: "triggerScan", type: "meta", tabId: currentTab.tabId }, r => { if (r?.ok === false) reject(new Error(r.error)); });
+      }).then(data => { metaScan = data; }).catch(err => { renderError("Не удалось собрать мета-теги: " + err.message); });
+      if (!metaScan) return;
+    }
+
     renderHeader(metaScan);
     renderBody(metaScan);
   } catch (err) {
