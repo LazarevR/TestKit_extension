@@ -38,7 +38,8 @@
 
     .content { padding: 12px 14px; }
 
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+    .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
+    .stats-3 { grid-template-columns: repeat(3, 1fr); }
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; text-align: center; }
     .stat-value { font-size: 18px; font-weight: 700; color: var(--accent); line-height: 1.2; }
     .stat-label { font-size: 10px; color: var(--muted); margin-top: 1px; }
@@ -84,12 +85,26 @@
       font-size: 10px; color: #475569; line-height: 1.4;
     }
 
+    .req-badge {
+      font-size: 9px; font-weight: 700;
+      padding: 1px 5px; border-radius: 4px;
+      background: #6366f120; color: #818cf8; border: 1px solid #6366f140;
+      letter-spacing: 0.04em; white-space: nowrap;
+    }
     .absent-badge {
       font-size: 9px; font-weight: 700;
       padding: 1px 5px; border-radius: 4px;
       background: #ef444420; color: #ef4444; border: 1px solid #ef444440;
       letter-spacing: 0.04em; white-space: nowrap;
     }
+    .dupe-badge {
+      font-size: 9px; font-weight: 700;
+      padding: 1px 5px; border-radius: 4px;
+      background: #f59e0b20; color: #f59e0b; border: 1px solid #f59e0b40;
+      letter-spacing: 0.04em; white-space: nowrap;
+    }
+    .tag-row.tag-dupe { background: #f59e0b05; }
+    .stat-warn .stat-value { color: #f59e0b; }
 
     .footer { text-align: center; padding: 8px; font-size: 10px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 4px; }
     .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 16px; color: var(--muted); gap: 8px; }

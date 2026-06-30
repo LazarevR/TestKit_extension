@@ -44,7 +44,8 @@ const GROUPS = [
   { key: "og",        label: "Open Graph",     color: "#6366f1" },
   { key: "twitter",   label: "Twitter / X",    color: "#06b6d4" },
   { key: "technical", label: "Техническое",    color: "#a855f7" },
-  { key: "other",     label: "Прочие теги",    color: "#64748b" },
+  { key: "other",      label: "Прочие теги",    color: "#64748b" },
+  { key: "duplicates", label: "Дубликаты!",     color: "#f59e0b" },
 ];
 
 // ── Init ─────────────────────────────────────────────────────
@@ -121,22 +122,27 @@ function renderHeader({ url, title, favIconUrl, timestamp }) {
 
 // ── Body ─────────────────────────────────────────────────────
 function renderBody({ pageTitle, tags, canonical }) {
-  // Build normalized lookup: key → first value found
+  // Build normalized lookup: key → first value found; track duplicates
   const found = new Map();
+  const droppedDupes = [];
   for (const tag of tags) {
     const key = (tag.property || tag.name || "").toLowerCase();
     if (tag.charset && !found.has("__charset__")) { found.set("__charset__", tag.charset); continue; }
     if (tag.httpEquiv) {
       const k = "http-equiv:" + tag.httpEquiv.toLowerCase();
       if (!found.has(k)) found.set(k, tag.content);
+      else droppedDupes.push({ key: k, value: tag.content || "" });
       continue;
     }
-    if (key && !found.has(key)) found.set(key, tag.content || "");
+    if (key) {
+      if (!found.has(key)) found.set(key, tag.content || "");
+      else droppedDupes.push({ key, value: tag.content || "" });
+    }
   }
   if (canonical) found.set("__canonical__", canonical);
 
   // Group items
-  const byGroup = { seo: [], og: [], twitter: [], technical: [], other: [] };
+  const byGroup = { seo: [], og: [], twitter: [], technical: [], other: [], duplicates: [] };
 
   // Virtual: page title
   byGroup.seo.push({ key: "title", present: true, value: pageTitle, desc: "Заголовок страницы. Самый важный SEO-элемент. Рекомендуемая длина: 50–60 символов.", expected: true });
@@ -179,25 +185,51 @@ function renderBody({ pageTitle, tags, canonical }) {
     byGroup[gKey] = byGroup[gKey].filter(it => { if (seen.has(it.key)) return false; seen.add(it.key); return true; });
   }
 
-  // Stats
-  const totalTags   = tags.length;
-  const ogPresent   = ["og:title","og:description","og:image"].filter(k => found.has(k)).length;
-  const twPresent   = found.has("twitter:card") ? 1 : 0;
+  // Duplicates group (populated after dedup so inner dedup pass doesn't touch it)
+  for (const d of droppedDupes) {
+    byGroup.duplicates.push({ key: d.key, present: true, value: d.value, keptValue: found.get(d.key) ?? "", desc: "", expected: false, isDupe: true });
+  }
 
+  // Stats — required vs extra
+  let reqPresent = 0, reqTotal = 0, extraCount = 0;
+  for (const [k, items] of Object.entries(byGroup)) {
+    if (k === "duplicates") continue;
+    for (const item of items) {
+      if (item.expected) {
+        reqTotal++;
+        if (item.present) reqPresent++;
+      } else if (item.present) {
+        extraCount++;
+      }
+    }
+  }
+
+  const hasDupes = droppedDupes.length > 0;
   let html = `
-    <div class="stats">
-      <div class="stat-card"><div class="stat-value">${totalTags}</div><div class="stat-label">мета-тегов</div></div>
-      <div class="stat-card"><div class="stat-value">${ogPresent}/3</div><div class="stat-label">Open Graph</div></div>
-      <div class="stat-card"><div class="stat-value">${twPresent}/1</div><div class="stat-label">Twitter Card</div></div>
+    <div class="stats${hasDupes ? " stats-3" : ""}">
+      <div class="stat-card"><div class="stat-value">${reqPresent}/${reqTotal}</div><div class="stat-label">обязательных</div></div>
+      <div class="stat-card"><div class="stat-value">${extraCount}</div><div class="stat-label">дополнительных</div></div>
+      ${hasDupes ? `<div class="stat-card stat-warn"><div class="stat-value">${droppedDupes.length}</div><div class="stat-label">дублей</div></div>` : ""}
     </div>`;
 
   for (const grp of GROUPS) {
     const items = byGroup[grp.key];
     if (!items || items.length === 0) continue;
     const presentCnt = items.filter(i => i.present).length;
-    const collapsed  = grp.key === "other" ? " collapsed" : "";
+    const collapsed  = (grp.key === "other" || grp.key === "duplicates") ? " collapsed" : "";
+    const countDisp  = grp.key === "duplicates" ? items.length : `${presentCnt}/${items.length}`;
 
     const rows = items.map(item => {
+      if (item.isDupe) {
+        const disp     = item.value.length > 140 ? item.value.slice(0, 137) + "…" : item.value;
+        const keptDisp = item.keptValue.length > 80 ? item.keptValue.slice(0, 77) + "…" : item.keptValue;
+        return `
+          <div class="tag-row tag-dupe">
+            <div class="tag-key">${esc(item.key)} <span class="dupe-badge">ДУБЛЬ</span></div>
+            <div class="tag-val" title="${esc(item.value)}">${esc(disp) || '<span style="color:#334155">—</span>'}</div>
+            <div class="tag-desc">Сохранён первый: ${esc(keptDisp) || "—"}</div>
+          </div>`;
+      }
       if (!item.present) return `
         <div class="tag-row tag-absent">
           <div class="tag-key">${esc(item.key)} <span class="absent-badge">ОТСУТСТВУЕТ</span></div>
@@ -205,10 +237,11 @@ function renderBody({ pageTitle, tags, canonical }) {
           ${item.desc ? `<div class="tag-desc">${esc(item.desc)}</div>` : ""}
         </div>`;
 
-      const disp = item.value.length > 140 ? item.value.slice(0, 137) + "…" : item.value;
+      const disp    = item.value.length > 140 ? item.value.slice(0, 137) + "…" : item.value;
+      const reqMark = item.expected ? ` <span class="req-badge">ОБЯЗ</span>` : "";
       return `
         <div class="tag-row">
-          <div class="tag-key" title="${esc(item.key)}">${esc(item.key)}</div>
+          <div class="tag-key" title="${esc(item.key)}">${esc(item.key)}${reqMark}</div>
           <div class="tag-val" title="${esc(item.value)}">${esc(disp) || '<span style="color:#334155">—</span>'}</div>
           ${item.desc ? `<div class="tag-desc">${esc(item.desc)}</div>` : ""}
         </div>`;
@@ -219,7 +252,7 @@ function renderBody({ pageTitle, tags, canonical }) {
         <div class="section-header" data-key="${grp.key}">
           <span class="section-dot" style="background:${grp.color}"></span>
           <span class="section-name">${esc(grp.label)}</span>
-          <span class="section-count">${presentCnt}/${items.length}</span>
+          <span class="section-count">${countDisp}</span>
           <span class="section-arrow">▼</span>
         </div>
         <div class="section-body">${rows}</div>
