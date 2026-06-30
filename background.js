@@ -718,8 +718,8 @@ async function fetchAndCacheRemoteTechDB() {
   const { remoteDbUrl = "" } = await chrome.storage.sync.get("remoteDbUrl");
   const url = remoteDbUrl.trim();
   if (!url) return false;
-  if (!url.startsWith("https://")) {
-    console.warn("[TestKit] Remote DB URL must use HTTPS");
+  if (!url.startsWith("https://") && !url.startsWith("http://")) {
+    console.warn("[TestKit] Remote DB URL must use HTTP or HTTPS");
     return false;
   }
 
