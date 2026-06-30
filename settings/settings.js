@@ -225,7 +225,7 @@ function createGroup() {
     hideAddGroupForm();
     render(newGroup.id);
     showToast("Группа создана");
-  });
+  }).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 function startRenameGroup(groupId) {
@@ -257,20 +257,20 @@ function startRenameGroup(groupId) {
 function confirmRenameGroup(groupId) {
   const input = document.querySelector(`[data-role="rename-input"][data-group-id="${groupId}"]`);
   const newName = input?.value.trim();
-  if (!newName) return;
+  if (!newName) { showToast("Введи название группы"); return; }
 
   const group = customMenus.find(g => g.id === groupId);
   if (!group) return;
   group.name = newName;
 
   const wasOpen = document.getElementById("gc-" + groupId)?.classList.contains("open");
-  save().then(() => render(wasOpen ? groupId : null));
+  save().then(() => render(wasOpen ? groupId : null)).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 function deleteGroup(groupId) {
   if (!confirm("Удалить группу и все её пункты?")) return;
   customMenus = customMenus.filter(g => g.id !== groupId);
-  save().then(() => render());
+  save().then(() => render()).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 // ── Subgroup operations ───────────────────────────────────────
@@ -318,7 +318,7 @@ function saveNewSubgroup(groupId) {
   save().then(() => {
     render(groupId);
     showToast("Подгруппа создана");
-  });
+  }).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 function deleteSubgroup(groupId, subgroupId) {
@@ -330,7 +330,7 @@ function deleteSubgroup(groupId, subgroupId) {
   save().then(() => {
     render(groupId);
     showToast("Подгруппа удалена");
-  });
+  }).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 // ── Item operations (direct in group) ────────────────────────
@@ -373,7 +373,7 @@ function saveNewItem(groupId) {
   save().then(() => {
     render(groupId);
     showToast("Пункт добавлен");
-  });
+  }).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 // ── Item operations (inside subgroup) ────────────────────────
@@ -419,7 +419,7 @@ function saveNewSubItem(groupId, subgroupId) {
   save().then(() => {
     render(groupId);
     showToast("Пункт добавлен");
-  });
+  }).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 // ── Edit / Delete items (work for both direct and sub-group items) ──
@@ -469,7 +469,7 @@ function saveEditItem(groupId, subgroupId, itemId) {
   save().then(() => {
     render(groupId);
     showToast("Сохранено");
-  });
+  }).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 function deleteItem(groupId, subgroupId, itemId) {
@@ -485,7 +485,7 @@ function deleteItem(groupId, subgroupId, itemId) {
   save().then(() => {
     render(groupId);
     showToast("Пункт удалён");
-  });
+  }).catch(err => showToast("Ошибка сохранения: " + err.message));
 }
 
 // ── Technology DB ─────────────────────────────────────────────
@@ -506,7 +506,7 @@ function renderDbStatus(updatedAt, count) {
   }
   const date = new Date(updatedAt).toLocaleString("ru-RU");
   el.innerHTML = `<span class="ok">✓</span> Обновлено: ${date}` +
-    (count ? ` · ${count} технологий` : "");
+    (count ? ` · ${parseInt(count, 10)} технологий` : "");
 }
 
 async function saveDbUrl() {
@@ -570,17 +570,22 @@ function importSettings(e) {
         if (typeof g.id !== "string" || typeof g.name !== "string" || !Array.isArray(g.items)) {
           showToast("Неверный формат файла"); return;
         }
+        if (g.name.length > 80) { showToast("Название группы слишком длинное (макс. 80)"); return; }
         for (const entry of g.items) {
           if (typeof entry.id !== "string") { showToast("Неверный формат файла"); return; }
           if (Array.isArray(entry.items)) {
             if (typeof entry.name !== "string") { showToast("Неверный формат файла"); return; }
+            if (entry.name.length > 80) { showToast("Название подгруппы слишком длинное (макс. 80)"); return; }
             for (const item of entry.items) {
               if (typeof item.id !== "string" || typeof item.content !== "string") {
                 showToast("Неверный формат файла"); return;
               }
+              if (item.content.length > 2000) { showToast("Текст пункта слишком длинный (макс. 2000)"); return; }
             }
           } else if (typeof entry.content !== "string") {
             showToast("Неверный формат файла"); return;
+          } else if (entry.content.length > 2000) {
+            showToast("Текст пункта слишком длинный (макс. 2000)"); return;
           }
         }
       }
@@ -600,7 +605,7 @@ function importSettings(e) {
 
 // ── Helpers ───────────────────────────────────────────────────
 function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  return crypto.randomUUID();
 }
 
 function escHtml(str) {

@@ -15,7 +15,7 @@ let lastFocused = null;
 document.addEventListener("focus", (e) => {
   const el = e.target;
   if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable) {
-    lastFocused = el;
+    lastFocused = new WeakRef(el);
   }
 }, true /* capture phase */);
 
@@ -35,7 +35,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 // ── Generic text insertion ───────────────────────────────────
 function insertText(text) {
-  const el = lastFocused || document.activeElement;
+  const el = lastFocused?.deref() || document.activeElement;
   if (!el || el === document.body || el === document.documentElement) return;
 
   if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
@@ -52,11 +52,15 @@ function insertText(text) {
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
-      range.deleteContents();
-      range.insertNode(document.createTextNode(text));
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
+      try {
+        range.deleteContents();
+        range.insertNode(document.createTextNode(text));
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } catch {
+        selection.removeAllRanges();
+      }
     }
   }
 }

@@ -106,11 +106,25 @@ async function init() {
       const { currentTab } = await chrome.storage.session.get("currentTab");
       if (!currentTab?.tabId) { renderError("Данные не найдены. Откройте через контекстное меню."); return; }
       document.getElementById("content").innerHTML = `<div class="loading"><div class="spinner"></div><span>Получаем заголовки…</span></div>`;
+      let _scanListener = null;
       await new Promise((resolve, reject) => {
-        chrome.storage.onChanged.addListener(function listener(changes, area) {
-          if (area === "session" && changes.headersScan) { chrome.storage.onChanged.removeListener(listener); resolve(changes.headersScan.newValue); }
+        let done = false;
+        const finish = (fn, val) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          if (_scanListener) chrome.storage.onChanged.removeListener(_scanListener);
+          fn(val);
+        };
+        const timer = setTimeout(() => finish(reject, new Error("Таймаут ответа (15с)")), 15000);
+        _scanListener = (changes, area) => {
+          if (area === "session" && changes.headersScan) finish(resolve, changes.headersScan.newValue);
+        };
+        chrome.storage.onChanged.addListener(_scanListener);
+        chrome.runtime.sendMessage({ action: "triggerScan", type: "headers", tabId: currentTab.tabId }, r => {
+          if (chrome.runtime.lastError) { finish(reject, new Error(chrome.runtime.lastError.message)); return; }
+          if (r?.ok === false) finish(reject, new Error(r.error));
         });
-        chrome.runtime.sendMessage({ action: "triggerScan", type: "headers", tabId: currentTab.tabId }, r => { if (r?.ok === false) reject(new Error(r.error)); });
       }).then(data => { headersScan = data; }).catch(err => { renderError("Не удалось получить заголовки: " + err.message); });
       if (!headersScan) return;
     }
@@ -130,7 +144,7 @@ function renderHeader({ url, title, favIconUrl, timestamp }) {
   const el     = document.getElementById("header");
   el.innerHTML = `
     <img class="header-favicon" id="hfav"
-         src="${favIconUrl || "https://www.google.com/s2/favicons?sz=32&domain=" + encodeURIComponent(domain)}" alt="">
+         src="${esc(favIconUrl) || "https://www.google.com/s2/favicons?sz=32&domain=" + encodeURIComponent(domain)}" alt="">
     <div class="header-text">
       <div class="header-title" title="${esc(title)}">${esc(title || domain)}</div>
       <div class="header-url"   title="${esc(url)}">${esc(domain)}</div>

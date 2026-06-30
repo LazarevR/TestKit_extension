@@ -38,11 +38,25 @@ async function init() {
       const { currentTab } = await chrome.storage.session.get("currentTab");
       if (!currentTab?.tabId) { renderError("Данные не найдены. Откройте через контекстное меню."); return; }
       document.getElementById("content").innerHTML = `<div class="loading"><div class="spinner"></div><span>Сканируем технологии…</span></div>`;
+      let _scanListener = null;
       await new Promise((resolve, reject) => {
-        chrome.storage.onChanged.addListener(function listener(changes, area) {
-          if (area === "session" && changes.techScan) { chrome.storage.onChanged.removeListener(listener); resolve(changes.techScan.newValue); }
+        let done = false;
+        const finish = (fn, val) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          if (_scanListener) chrome.storage.onChanged.removeListener(_scanListener);
+          fn(val);
+        };
+        const timer = setTimeout(() => finish(reject, new Error("Таймаут ответа (15с)")), 15000);
+        _scanListener = (changes, area) => {
+          if (area === "session" && changes.techScan) finish(resolve, changes.techScan.newValue);
+        };
+        chrome.storage.onChanged.addListener(_scanListener);
+        chrome.runtime.sendMessage({ action: "triggerScan", type: "tech", tabId: currentTab.tabId }, r => {
+          if (chrome.runtime.lastError) { finish(reject, new Error(chrome.runtime.lastError.message)); return; }
+          if (r?.ok === false) finish(reject, new Error(r.error));
         });
-        chrome.runtime.sendMessage({ action: "triggerScan", type: "tech", tabId: currentTab.tabId }, r => { if (r?.ok === false) reject(new Error(r.error)); });
       }).then(data => { techScan = data; }).catch(err => { renderError("Не удалось выполнить сканирование: " + err.message); });
       if (!techScan) return;
     }
@@ -63,7 +77,7 @@ function renderHeader({ url, title, favIconUrl, timestamp }) {
 
   header.innerHTML = `
     <img class="header-favicon" id="header-favicon"
-         src="${favIconUrl || `https://www.google.com/s2/favicons?sz=32&domain=${encodeURIComponent(domain)}`}"
+         src="${escHtml(favIconUrl) || `https://www.google.com/s2/favicons?sz=32&domain=${encodeURIComponent(domain)}`}"
          alt="">
     <div class="header-text">
       <div class="header-title" title="${escHtml(title)}">${escHtml(title || domain)}</div>
@@ -187,7 +201,7 @@ function statRow(label, value) {
   return `
     <div class="meta-row">
       <span class="meta-key">${escHtml(label)}</span>
-      <span class="meta-val">${value}</span>
+      <span class="meta-val">${escHtml(String(value))}</span>
     </div>
   `;
 }

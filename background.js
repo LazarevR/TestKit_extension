@@ -317,15 +317,15 @@ EMAIL_GROUPS.forEach(g => g.items.forEach((item, j) => BUILTIN_MAP.set(`dk-email
 
 // ── Lifecycle ─────────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(() => {
-  buildContextMenu();
+  buildContextMenu().catch(err => console.error("[TestKit] buildContextMenu failed:", err));
   chrome.alarms.create("testkit-db-refresh", { periodInMinutes: 24 * 60 });
-  fetchAndCacheRemoteTechDB();
+  fetchAndCacheRemoteTechDB().catch(err => console.error("[TestKit] Initial DB fetch failed:", err));
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  buildContextMenu();
+  buildContextMenu().catch(err => console.error("[TestKit] buildContextMenu failed:", err));
   const { [DB_REMOTE_UPDATED_KEY]: updatedAt = 0 } = await chrome.storage.local.get(DB_REMOTE_UPDATED_KEY);
-  if (Date.now() - updatedAt > DB_REFRESH_INTERVAL) fetchAndCacheRemoteTechDB();
+  if (Date.now() - updatedAt > DB_REFRESH_INTERVAL) fetchAndCacheRemoteTechDB().catch(err => console.warn("[TestKit] DB refresh failed:", err));
 });
 
 // Rebuild menu when custom menus change in settings
@@ -335,7 +335,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // Daily alarm → refresh remote DB
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "testkit-db-refresh") fetchAndCacheRemoteTechDB();
+  if (alarm.name === "testkit-db-refresh") fetchAndCacheRemoteTechDB().catch(err => console.warn("[TestKit] DB refresh failed:", err));
 });
 
 // Toolbar icon → settings
@@ -367,6 +367,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
   if (msg.action === "triggerScan") {
+    if (typeof msg.tabId !== "number") { sendResponse({ ok: false, error: "invalid tabId" }); return true; }
     chrome.tabs.get(msg.tabId).then(async tab => {
       if (msg.type === "tech")    await scanTechData(tab);
       if (msg.type === "headers") await scanHeadersData(tab);
@@ -590,6 +591,7 @@ async function handleTechnology(tab) {
 // Firefox does not support per-origin cache clearing (origins parameter ignored/throws).
 // bypassCache reload is the effective solution for both browsers.
 async function handleClearCache(tab) {
+  if (!tab?.url || !/^https?:\/\//.test(tab.url)) return;
   const { origin } = new URL(tab.url);
   // Chrome: clears cache for this origin only; Firefox: throws (not supported) — ignore
   try {
@@ -613,6 +615,7 @@ async function handleClearCache(tab) {
 // Firefox < 128: `origins` not supported; falls back to `hostnames` (supported since Firefox 56).
 // sessionStorage and indexedDB are not compatible with origin/hostname filtering → excluded.
 async function handleClearData(tab) {
+  if (!tab?.url || !/^https?:\/\//.test(tab.url)) return;
   const url = new URL(tab.url);
   const { origin } = url;
   const hostname = url.hostname;
@@ -633,7 +636,11 @@ async function handleClearData(tab) {
       console.error("[TestKit] Clear data failed:", err2);
     }
   }
-  await chrome.tabs.reload(tab.id, { bypassCache: true });
+  try {
+    await chrome.tabs.reload(tab.id, { bypassCache: true });
+  } catch (err) {
+    console.error("[TestKit] Hard reload after clear failed:", err);
+  }
 }
 
 // ── Lorem ipsum ───────────────────────────────────────────────
@@ -664,6 +671,7 @@ async function handleCustomItem(tab, itemId) {
         }
       }
     }
+    console.warn("[TestKit] Custom item not found:", itemId);
   } catch (err) {
     console.warn("[TestKit] Custom item: failed.", err.message);
   }
@@ -710,6 +718,10 @@ async function fetchAndCacheRemoteTechDB() {
   const { remoteDbUrl = "" } = await chrome.storage.sync.get("remoteDbUrl");
   const url = remoteDbUrl.trim();
   if (!url) return false;
+  if (!url.startsWith("https://")) {
+    console.warn("[TestKit] Remote DB URL must use HTTPS");
+    return false;
+  }
 
   try {
     const res = await fetch(url, { cache: "no-store" });
@@ -824,6 +836,8 @@ function scanTechnologies(remoteDB) {
   if (/weebly/i.test(generator))      add("cms", "Weebly");
   if (/shopify/i.test(generator))     add("cms", "Shopify");
   if (/bitrix/i.test(generator))      add("cms", "1C-Bitrix");
+  // These window-global checks are intentionally complementary to the generator
+  // meta checks above — a site may expose globals without setting the generator tag.
   if (w.Shopify) add("cms", "Shopify");
   if (w.Drupal)  add("cms", "Drupal");
   if (w.Mage || w.MAGE)    add("cms", "Magento");
@@ -928,11 +942,11 @@ function scanTechnologies(remoteDB) {
           try { if (chk.css && doc.querySelector(chk.css)) found = true; } catch {}
         } else if (chk.type === "script") {
           try {
-            if (chk.pattern && new RegExp(chk.pattern, "i").test(allScripts)) found = true;
+            if (chk.pattern && chk.pattern.length <= 500 && new RegExp(chk.pattern, "i").test(allScripts)) found = true;
           } catch {}
         } else if (chk.type === "stylesheet") {
           try {
-            if (chk.pattern && new RegExp(chk.pattern, "i").test(allLinks)) found = true;
+            if (chk.pattern && chk.pattern.length <= 500 && new RegExp(chk.pattern, "i").test(allLinks)) found = true;
           } catch {}
         } else if (chk.type === "meta") {
           try {
@@ -940,9 +954,9 @@ function scanTechnologies(remoteDB) {
             const mEl   = (chk.name || chk.property) ? doc.querySelector(sel) : null;
             if (mEl) {
               const content = mEl.getAttribute("content") || "";
-              if (!chk.pattern || new RegExp(chk.pattern, "i").test(content)) {
+              if (!chk.pattern || (chk.pattern.length <= 500 && new RegExp(chk.pattern, "i").test(content))) {
                 found = true;
-                if (chk.version_pattern) {
+                if (chk.version_pattern && chk.version_pattern.length <= 500) {
                   const m = content.match(new RegExp(chk.version_pattern));
                   if (m) version = m[1] ?? m[0];
                 }
