@@ -317,20 +317,20 @@ EMAIL_GROUPS.forEach(g => g.items.forEach((item, j) => BUILTIN_MAP.set(`dk-email
 
 // ── Lifecycle ─────────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener(() => {
-  buildContextMenu().catch(err => console.error("[TestKit] buildContextMenu failed:", err));
+  queueBuildContextMenu();
   chrome.alarms.create("testkit-db-refresh", { periodInMinutes: 24 * 60 });
   fetchAndCacheRemoteTechDB().catch(err => console.error("[TestKit] Initial DB fetch failed:", err));
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  buildContextMenu().catch(err => console.error("[TestKit] buildContextMenu failed:", err));
+  queueBuildContextMenu();
   const { [DB_REMOTE_UPDATED_KEY]: updatedAt = 0 } = await chrome.storage.local.get(DB_REMOTE_UPDATED_KEY);
   if (Date.now() - updatedAt > DB_REFRESH_INTERVAL) fetchAndCacheRemoteTechDB().catch(err => console.warn("[TestKit] DB refresh failed:", err));
 });
 
 // Rebuild menu when custom menus change in settings
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "sync" && changes.customMenus) buildContextMenu();
+  if (area === "sync" && changes.customMenus) queueBuildContextMenu();
 });
 
 // Daily alarm → refresh remote DB
@@ -379,10 +379,26 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 // ── Context menu ──────────────────────────────────────────────
+// buildContextMenu() must never run concurrently with itself: onInstalled,
+// onStartup and storage.onChanged can all fire close together, and two
+// overlapping removeAll()+create() sequences race and throw
+// "Cannot create item with duplicate id". Route every call through this
+// queue so builds always run one at a time, each waiting for removeAll
+// to actually finish before creating items.
+let menuBuildChain = Promise.resolve();
+function queueBuildContextMenu() {
+  menuBuildChain = menuBuildChain
+    .then(() => buildContextMenu())
+    .catch(err => console.error("[TestKit] buildContextMenu failed:", err));
+  return menuBuildChain;
+}
+
 async function buildContextMenu() {
   const { customMenus = [] } = await chrome.storage.sync.get("customMenus");
 
-  chrome.contextMenus.removeAll(() => {
+  await new Promise(resolve => chrome.contextMenus.removeAll(resolve));
+
+  {
     const cx = ["all"];
     const mk = (props) => chrome.contextMenus.create(props);
 
@@ -481,7 +497,7 @@ async function buildContextMenu() {
     mk({ id: "dk-sep5",         parentId: "dk", type: "separator",                 contexts: cx });
     mk({ id: "dk-storage-info", parentId: "dk", title: "💾 Хранилище: —",
          enabled: false,                                                             contexts: cx });
-  });
+  }
 }
 
 // ── Click handler ─────────────────────────────────────────────
